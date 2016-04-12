@@ -1,0 +1,6 @@
+data/
+*.feather
+*.mov
+*.pdf
+.Rproj.user
+.Rhistory
