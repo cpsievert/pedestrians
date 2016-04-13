@@ -1,7 +1,10 @@
+# requires plotly's new transition support 
+# devtools::install_github("ropensci/plotly@feature/transition")
 library(shiny)
 library(leaflet)
 library(plotly)
 library(dplyr)
+library(tourr)
 
 # read in data
 pedestrians <- feather::read_feather("pedestrians.feather")
@@ -15,15 +18,7 @@ names(sensors) <- sub("^Sensor ", "", names(sensors))
 sensors <- semi_join(sensors, pedestrians, by = "ID")
 
 cog <- feather::read_feather("cognostics.feather")
-# compute pca and grab first two principal components
-pcaDat <- setNames(
-  data.frame(cog[, 1], princomp(cog, cor = TRUE)$scores[, 1:2]),
-  c("ID", "Comp.1", "Comp.2")
-)
-# attach sensor description for informative tooltips
-pcaDat <- left_join(
-  pcaDat, sensors[c("ID", "Description")], by = "ID"
-)
+names(cog) <- c("ID", names(cog)[-1])
 
 # mechanism for managing selected sensors
 init <- function() {
@@ -78,15 +73,23 @@ ui <- fluidPage(
   plotlyOutput("timeSeries"),
   fluidRow(
     column(
-      width = 6,
+      width = 5,
       leafletOutput("map")
     ),
     column(
-      width = 6, 
-      plotlyOutput("pcaPlot")
+      width = 4, 
+      plotlyOutput("tourPlot")
+    ),
+    column(
+      width = 3,
+      h4("Touring controls:"),
+      checkboxInput("play", "Start Grand Tour:", value = FALSE),
+      selectizeInput(
+        "tourVars", "Touring variables:", multiple = TRUE, 
+        names(cog)[-1], names(cog)[-1]
+      )
     )
-  ),
-  verbatimTextOutput("selection")
+  )
 )
 server <- function(input, output, session) {
   
@@ -105,7 +108,6 @@ server <- function(input, output, session) {
   selectHandler <- reactive({
     # if not in persistant selection mode, clear the selection first
     if (!input$persist) selection(FALSE, "black", `&`)
-    
     eventData <- unique(c(
       event_data("plotly_click")[["key"]],
       event_data("plotly_selected")[["key"]],
@@ -165,21 +167,49 @@ server <- function(input, output, session) {
     )
   })
   
-  output$pcaPlot <- renderPlotly({
-    dat <- inner_join(selectHandler(), pcaDat, by = "ID")
-    p <- ggplot(dat, aes(Comp.1, Comp.2, 
-                         text = Description, key = ID)) + 
-      geom_point(aes(colour = fill)) + scale_colour_identity() +
-      theme(aspect.ratio = 1, legend.position = "none") + 
-      labs(x = NULL, y = NULL)
-    
-    ggplotly(p, tooltip = "text") %>%
-      layout(dragmode = "select")
+  # touring stuffs
+  initTour <- reactive({
+    mat <- scales::rescale(as.matrix(cog[input$tourVars]))
+    tour <- new_tour(mat, grand_tour(), NULL)
+    list(
+      mat = mat,
+      tour = tour,
+      step = tour(0)
+    )
   })
   
-  #output$selection <- renderPrint({
-  #  summary(selectHandler())
-  #})
+  iterTour <- reactive({
+    tr <- initTour()
+    if (input$play) invalidateLater(1000 / 30, NULL)
+    tr$step <- tr$tour(2 / 30) # you always want 30 frames/second, right?
+    list(
+      mat = tr$mat,
+      tour = tr$tour,
+      step = tr$step
+    )
+  })
+  
+  tourDat <- reactive({
+    tr <- iterTour()
+    tDat <- setNames(
+      data.frame(cog[, 1], center(tr$mat %*% tr$step$proj)), 
+      c("ID", "x", "y")
+    )
+    inner_join(selectHandler(), tDat, by = "ID")
+  })
+  
+  output$tourPlot <- renderPlotly({
+    dat <- inner_join(tourDat(), sensors[c("ID", "Description")], by = "ID")
+    plot_ly(
+      dat, x = x, y = y, text = Description, key = ID,
+      mode = "markers", hoverinfo = "text", marker = list(color = toRGB(fill, 0.5))
+    ) %>% layout(
+      width = 400, height = 400, showlegend = FALSE,
+      xaxis = list(title = "", range = c(-1, 1)), 
+      yaxis = list(title = "", range = c(-1, 1))
+    )
+  })
+  
 }
 
 shinyApp(ui, server)
