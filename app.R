@@ -9,8 +9,9 @@ library(tourr)
 # read in data
 pedestrians <- feather::read_feather("pedestrians.feather")
 names(pedestrians) <- sub("^Sensor", "", names(pedestrians))
+pedestrians$Month <- format(pedestrians$DateTime, format = "%b")
 # random sample (needed for performance/speed)
-pedSample <- pedestrians[sample(seq_len(nrow(pedestrians)), 10000), ]
+pedSample <- pedestrians[sample(seq_len(nrow(pedestrians)), 100000), ]
 
 sensors <- feather::read_feather("sensors.feather")
 names(sensors) <- sub("^Sensor ", "", names(sensors))
@@ -138,6 +139,20 @@ server <- function(input, output, session) {
     dat$tooltip <- apply(dat[input$tooltip], 1, function(x) {
       paste0(colnames(dat[input$tooltip]), ": ", x, collapse = "<br />")
     })
+    # dates are slow, so we force x to always be numeric
+    # first off, how many tick labels to show?
+    nTicks <- length(unique(dat[[input$x]]))
+    # 12 months and 3 years for datetimes
+    qs <- quantile(dat[[input$x]], seq(0, 1, length.out = min(nTicks, 36)))
+    xAxis <- list(
+      title = "", 
+      range = c(0, 1),
+      ticktext = if ("POSIXct" %in% class(qs)) scales::date_format("%b %y")(qs) else as.character(qs), 
+      tickvals = as.numeric(sub("%", "", names(qs))) / 100,
+      tickangle = -45
+    )
+    dat[[input$x]] <- scales::rescale(as.numeric(dat[[input$x]]))
+    
     if (any(dat$selected)) {
       s <- filter(dat, selected)
       ns <- filter(dat, !selected)
@@ -162,7 +177,7 @@ server <- function(input, output, session) {
     }
     layout(
       p, showlegend = FALSE, 
-      xaxis = list(title = ""), 
+      xaxis = xAxis,
       yaxis = list(title = "Counts")
     )
   })
