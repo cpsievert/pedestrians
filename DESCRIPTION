@@ -1,0 +1,20 @@
+Package: pedestrians
+Title: Tools for exploring Melbourne's Pedestrian Data
+Version: 0.0.1
+Authors@R: person("Carson", "Sievert", role = c("aut", "cre"),
+    email = "cpsievert1@gmail.com")
+License: MIT + file LICENSE
+Description: Tools for exploring Melbourne's Pedestrian Data
+URL: https://github.com/cpsievert/pedestrians
+BugReports: https://github.com/cpsievert/pedestrians/issues
+Imports:
+    shiny,
+    plotly,
+    leaflet,
+    dplyr,
+    tourr
+LazyData: true
+VignetteBuilder: knitr
+Remotes: rstudio/leaflet,
+    ropensci/plotly@feature/transition
+RoxygenNote: 5.0.1
