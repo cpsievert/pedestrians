@@ -1,5 +1,4 @@
 *.DS_Store
-*.mov
-*.pdf
 .Rproj.user
 .Rhistory
+materials/

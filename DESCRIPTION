@@ -13,6 +13,7 @@ Imports:
     leaflet,
     dplyr,
     tourr
+Suggests: knitr
 LazyData: true
 VignetteBuilder: knitr
 Remotes: rstudio/leaflet,

@@ -1,20 +1,24 @@
 #' Launch shiny app for exploring pedestrian data
 #' 
+#' @param prop what proportion of the raw data should be displayed?
+#' 
 #' @export
 #' @examples \dontrun{
 #' launchApp()
 #' }
 
 
-launchApp <- function() {
+launchApp <- function(prop = 0.01) {
   
   data("pedestrians")
   data("sensors")
   data("cog")
-  # random sample (needed for performance/speed)
-  pedSample <- pedestrians[sample(seq_len(nrow(pedestrians)), 10000), ]
   
-  # mechanism for managing selected sensors
+  # random sample (needed for performance/speed)
+  n <- nrow(pedestrians)
+  pedSample <- pedestrians[sample(n, n * prop), ]
+  
+  # mechanism for maintain selection across
   init <- function() {
     s <- data.frame(
       ID = sensors$ID,
@@ -52,12 +56,18 @@ launchApp <- function() {
           selectInput(
             "brushColor", "Selection Color", 
             choices = c("red", "purple", "green", "blue", "yellow")
+          ),
+          numericInput(
+            "alphaSelect", "Alpha transparency of selections", value = 2 / (prop * 1000), min = 0, max = 1
           )
         ),
         column(
           width = 3,
           h4("Time Series controls:"),
           selectInput("x", "Choose a X:", names(pedestrians), selected = "DateTime"),
+          numericInput(
+            "alpha", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
+          ),
           selectizeInput(
             "tooltip", "Choose variable to show in tooltip", multiple = TRUE,
             names(pedestrians), selected = c("Year", "Month", "Day", "Hour") 
@@ -68,21 +78,12 @@ launchApp <- function() {
     plotlyOutput("timeSeries"),
     fluidRow(
       column(
-        width = 5,
+        width = 4,
         leafletOutput("map")
       ),
       column(
-        width = 4, 
-        plotlyOutput("tourPlot")
-      ),
-      column(
-        width = 3,
-        h4("Touring controls:"),
-        checkboxInput("play", "Start Grand Tour:", value = FALSE),
-        selectizeInput(
-          "tourVars", "Touring variables:", multiple = TRUE, 
-          names(cog)[-1], names(cog)[-1]
-        )
+        width = 7,
+        plotlyOutput("pcp")
       )
     )
   )
@@ -109,6 +110,7 @@ launchApp <- function() {
         input$map_marker_click
       ))
       if (!is.null(eventData)) {
+        # isolate ensures this doesn't get invalidated when brushColor changes
         isolate({
           selection(eventData, input$brushColor, `|`)
         })
@@ -126,6 +128,19 @@ launchApp <- function() {
           )
       }
       dat
+    })
+    
+    output$pcp <- renderPlotly({
+      cog01 <- data.frame(cog[, 1], lapply(cog[, -1], scales::rescale))
+      dat <- inner_join(tidyr::gather(cog01, variable, value, -ID), selectHandler(), by = "ID")
+      p <- ggplot(dat, aes(variable, value, key = ID, group = ID, color = fill)) + 
+        geom_point(size =  0.0001) + geom_line() +
+        scale_color_identity() + labs(x = NULL, y = NULL) + theme_bw() + 
+        theme(axis.text.x = element_text(angle = 45), legend.position = "none")
+      l <- plotly_build(p) 
+      l$layout$margin$b <- l$layout$margin$b + 20
+      l$layout$dragmode <- "select"
+      l
     })
     
     output$timeSeries <- renderPlotly({
@@ -154,19 +169,19 @@ launchApp <- function() {
         p <- plot_ly(
           x = ns[[input$x]], y = ns$Counts, text = ns$tooltip,
           type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(ns$fill, 0.01))
+          marker = list(color = toRGB(ns$fill, input$alpha))
         )
         # TODO: trace for each fill?
         p <- add_trace(
           p, x = s[[input$x]], y = s$Counts, text = s$tooltip,
           type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(s$fill, 0.2))
+          marker = list(color = toRGB(s$fill, input$alphaSelect))
         )
       } else {
         p <- plot_ly(
           x = dat[[input$x]], y = dat$Counts, text = dat$tooltip,
           type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(dat$fill, 0.05))
+          marker = list(color = toRGB(dat$fill, input$alpha))
         )
       }
       layout(
@@ -175,52 +190,7 @@ launchApp <- function() {
         yaxis = list(title = "Counts")
       )
     })
-    
-    # touring stuffs
-    initTour <- reactive({
-      mat <- scales::rescale(as.matrix(cog[input$tourVars]))
-      tour <- new_tour(mat, grand_tour(), NULL)
-      list(
-        mat = mat,
-        tour = tour,
-        step = tour(1)
-      )
-    })
-    
-    iterTour <- reactive({
-      tr <- initTour()
-      if (input$play) invalidateLater(1000 / 30, NULL)
-      tr$step <- tr$tour(2 / 30) # you always want 30 frames/second, right?
-      list(
-        mat = tr$mat,
-        tour = tr$tour,
-        step = tr$step
-      )
-    })
-    
-    tourDat <- reactive({
-      tr <- iterTour()
-      tDat <- setNames(
-        data.frame(cog[, 1], tr$mat %*% tr$step$proj), 
-        c("ID", "x", "y")
-      )
-      inner_join(selectHandler(), tDat, by = "ID")
-    })
-    
-    output$tourPlot <- renderPlotly({
-      dat <- inner_join(tourDat(), sensors[c("ID", "Description")], by = "ID")
-      plot_ly(
-        dat, x = x, y = y, text = Description, key = ID,
-        mode = "markers", hoverinfo = "text", marker = list(color = toRGB(fill, 0.5))
-      ) %>% layout(
-        width = 400, height = 400, showlegend = FALSE,
-        xaxis = list(title = "", range = c(-1, 1)), 
-        yaxis = list(title = "", range = c(-1, 1))
-      )
-    })
-    
   }
   
   shinyApp(ui, server)
-  
 }

@@ -4,7 +4,10 @@
 \alias{launchApp}
 \title{Launch shiny app for exploring pedestrian data}
 \usage{
-launchApp()
+launchApp(prop = 0.01)
+}
+\arguments{
+\item{prop}{what proportion of the raw data should be displayed?}
 }
 \description{
 Launch shiny app for exploring pedestrian data
