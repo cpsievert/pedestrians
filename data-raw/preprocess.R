@@ -15,20 +15,22 @@ pedestrians <- pedestrians %>%
   mutate(Year = year(DateTime)) %>%
   mutate(Month = month(DateTime)) %>%
   mutate(Day = day(DateTime)) %>%
+  mutate(Wday = wday(DateTime)) %>%
+  mutate(Weekend = as.numeric(Wday %in% c(1, 6, 7))) %>%
   mutate(Hour = hour(DateTime)) %>%
   # minutes are all zero
   #mutate(Minute = minute(DateTime)) %>%
   # Data is inconsistent before 2013 (also, some dates pre-2013 have parsing trouble)
   filter(!is.na(DateTime), Year >= 2013)
 
-devtools::use_data(pedestrians)
+devtools::use_data(pedestrians, overwrite = T)
 
 sensors <- read_csv("data-raw/Pedestrian_Sensor_Locations.csv")
 names(sensors) <- sub("^Sensor ", "", names(sensors))
 # there are some sensors that don't have any pedestrian data
-sensors <- semi_join(sensors, pedestrians, by = "ID")
-devtools::use_data(sensors)
+sensors2 <- semi_join(sensors, pedestrians, by = "ID")
+devtools::use_data(sensors, overwrite = T)
 
 cog <- read_csv("data-raw/pedestrian-cognostics.csv")
 names(cog) <- c("ID", names(cog)[-1])
-devtools::use_data(cog)
+devtools::use_data(cog, overwrite = T)

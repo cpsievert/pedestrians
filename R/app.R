@@ -58,34 +58,36 @@ launchApp <- function(prop = 0.01) {
             choices = c("red", "purple", "green", "blue", "yellow")
           ),
           numericInput(
-            "alphaSelect", "Alpha transparency of selections", value = 2 / (prop * 1000), min = 0, max = 1
+            "alphaSelect", "Alpha transparency", value = 3 / (prop * 1000), min = 0, max = 1
           )
         ),
         column(
           width = 3,
           h4("Time Series controls:"),
-          selectInput("x", "Choose a X:", names(pedestrians), selected = "DateTime"),
+          selectInput("x", "Choose an X:", names(pedestrians), selected = "DateTime"),
+          selectInput("filter", "Choose a filter:", c("none", names(pedestrians)), selected = "none"),
+          selectInput("facet", "Choose a conditioning:", c("none", names(pedestrians)), selected = "none"),
           numericInput(
-            "alpha", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
+            "alphaBase", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
           ),
           selectizeInput(
             "tooltip", "Choose variable to show in tooltip", multiple = TRUE,
-            names(pedestrians), selected = c("Year", "Month", "Day", "Hour") 
+            names(pedestrians), selected = c("DateTime", "Name") 
           )
         )
       )
     ),
-    plotlyOutput("timeSeries"),
     fluidRow(
       column(
         width = 4,
         leafletOutput("map")
       ),
       column(
-        width = 7,
+        width = 8,
         plotlyOutput("pcp")
       )
-    )
+    ),
+    plotlyOutput("timeSeries")
   )
   server <- function(input, output, session) {
     
@@ -118,12 +120,14 @@ launchApp <- function(prop = 0.01) {
       # before returning selection data,
       # add a marker to the map (without redrawing the whole thing)
       dat <- selection()
+      leafletProxy("map", session) %>% 
+        removeMarker(paste0("selected", dat$ID))
+      
       if (any(dat$selected)) {
         d <- dat %>% filter(selected) %>% left_join(sensors, by = "ID")
-        leafletProxy("map", session) %>% 
-          removeMarker(paste0("selected", dat$ID)) %>%
+        leafletProxy("map", session) %>%
           addCircleMarkers(
-            d$Longitude, d$Latitude, layerId = paste0("selected", dat$ID),
+            d$Longitude, d$Latitude, layerId = paste0("selected", d$ID),
             label = d$Description, color = d$fill
           )
       }
@@ -132,12 +136,14 @@ launchApp <- function(prop = 0.01) {
     
     output$pcp <- renderPlotly({
       cog01 <- data.frame(cog[, 1], lapply(cog[, -1], scales::rescale))
-      dat <- inner_join(tidyr::gather(cog01, variable, value, -ID), selectHandler(), by = "ID")
-      p <- ggplot(dat, aes(variable, value, key = ID, group = ID, color = fill)) + 
-        geom_point(size =  0.0001) + geom_line() +
-        scale_color_identity() + labs(x = NULL, y = NULL) + theme_bw() + 
+      cog01 <- left_join(cog01, sensors[c("ID", "Description")], by = "ID")
+      dat <- inner_join(tidyr::gather(cog01, variable, value, -ID, -Description), selectHandler(), by = "ID")
+      #dat <- left_join(dat, sensors[c("ID", "Description")], by = "ID")
+      p <- ggplot(dat, aes(variable, value, text = Description, key = ID, group = ID, color = fill)) + 
+        geom_point(size =  0.0001) + geom_line(alpha = 0.5) +
+        scale_color_identity() + labs(x = NULL, y = NULL) + 
         theme(axis.text.x = element_text(angle = 45), legend.position = "none")
-      l <- plotly_build(p) 
+      l <- plotly_build(ggplotly(p, tooltip = "text")) 
       l$layout$margin$b <- l$layout$margin$b + 20
       l$layout$dragmode <- "select"
       l
@@ -148,49 +154,34 @@ launchApp <- function(prop = 0.01) {
       dat$tooltip <- apply(dat[input$tooltip], 1, function(x) {
         paste0(colnames(dat[input$tooltip]), ": ", x, collapse = "<br />")
       })
-      # dates are slow, so we force x to always be numeric
-      # first off, how many tick labels to show?
-      nTicks <- length(unique(dat[[input$x]]))
-      # 12 months and 3 years for datetimes
-      qs <- quantile(dat[[input$x]], seq(0, 1, length.out = min(nTicks, 36)))
-      xAxis <- list(
-        title = "", 
-        range = c(0, 1),
-        ticktext = if ("POSIXct" %in% class(qs)) scales::date_format("%b %y")(qs) else as.character(qs), 
-        tickvals = as.numeric(sub("%", "", names(qs))) / 100,
-        tickangle = -45
-      )
-      dat[[input$x]] <- scales::rescale(as.numeric(dat[[input$x]]))
-      
+      pointMap <- aes_string(x = input$x, y = "Counts", color = "fill", text = "tooltip")
+      smoothMap <- aes_string(x = input$x, y = "Counts", color = "fill")
+      d <- dat[!dat$selected, ]
+      p <- ggplot(data = d) + 
+        geom_point(pointMap, alpha = input$alphaBase) + 
+        geom_smooth(smoothMap, se = FALSE) + 
+        labs(x = NULL, y = NULL) + scale_color_identity() 
       if (any(dat$selected)) {
-        s <- filter(dat, selected)
-        ns <- filter(dat, !selected)
-        # draw the "non-selected" (shadowed) points first
-        p <- plot_ly(
-          x = ns[[input$x]], y = ns$Counts, text = ns$tooltip,
-          type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(ns$fill, input$alpha))
-        )
-        # TODO: trace for each fill?
-        p <- add_trace(
-          p, x = s[[input$x]], y = s$Counts, text = s$tooltip,
-          type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(s$fill, input$alphaSelect))
-        )
-      } else {
-        p <- plot_ly(
-          x = dat[[input$x]], y = dat$Counts, text = dat$tooltip,
-          type = "scattergl", mode = "markers", hoverinfo = "text",
-          marker = list(color = toRGB(dat$fill, input$alpha))
-        )
+        d <- dat[dat$selected, ]
+        p <- p + 
+          geom_smooth(data = d,  smoothMap, se = FALSE) +
+          geom_point(data = d, pointMap,alpha = input$alphaSelect) 
       }
-      layout(
-        p, showlegend = FALSE, 
-        xaxis = xAxis,
-        yaxis = list(title = "Counts")
-      )
+      if (input$facet != "none") {
+        p <- p + 
+          facet_wrap(as.formula(paste("~", input$facet)), ncol = 1, scales = "free")
+      }
+      l <- plotly_build(ggplotly(p, tooltip = "text"))
+      l$data <- lapply(l$data, function(x) { x$type <- "scattergl"; x })
+      l$layout$height <- 600 * max(1, length(unique(pedSample[[input$facet]])))
+      l
     })
+    
+    #output$timeSeries2 <- renderUI({
+    #  height <- 600 * max(1, length(unique(pedSample[[input$facet]])))
+    #  plotlyOutput("timeSeries", height = height)
+    #})
+    
   }
-  
   shinyApp(ui, server)
 }
