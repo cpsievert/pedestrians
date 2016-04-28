@@ -9,14 +9,11 @@
 
 
 launchApp <- function(prop = 0.01) {
-  
-  data("pedestrians")
-  data("sensors")
-  data("cog")
-  
+  sensors <- pedestrians::sensors
+  vars <- names(pedestrians::pedestrians)
   # random sample (needed for performance/speed)
-  n <- nrow(pedestrians)
-  pedSample <- pedestrians[sample(n, n * prop), ]
+  n <- nrow(pedestrians::pedestrians)
+  pedSample <- pedestrians::pedestrians[sample(n, n * prop), ]
   
   # mechanism for maintain selection across
   init <- function() {
@@ -64,15 +61,15 @@ launchApp <- function(prop = 0.01) {
         column(
           width = 3,
           h4("Time Series controls:"),
-          selectInput("x", "Choose an X:", names(pedestrians), selected = "DateTime"),
-          selectInput("filter", "Choose a filter:", c("none", names(pedestrians)), selected = "none"),
-          selectInput("facet", "Choose a conditioning:", c("none", names(pedestrians)), selected = "none"),
+          selectInput("x", "Choose an X:", vars, selected = "Hour"),
+          selectInput("filter", "Choose a filter:", c("none", vars), selected = "none"),
+          selectInput("facet", "Choose a conditioning:", c("none", vars), selected = "none"),
           numericInput(
             "alphaBase", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
           ),
           selectizeInput(
             "tooltip", "Choose variable to show in tooltip", multiple = TRUE,
-            names(pedestrians), selected = c("DateTime", "Name") 
+            vars, selected = c("DateTime", "Name") 
           )
         )
       )
@@ -135,7 +132,10 @@ launchApp <- function(prop = 0.01) {
     })
     
     output$pcp <- renderPlotly({
-      cog01 <- data.frame(cog[, 1], lapply(cog[, -1], scales::rescale))
+      cog01 <- data.frame(
+        pedestrians::cog[, 1], 
+        lapply(pedestrians::cog[, -1], scales::rescale)
+      )
       cog01 <- left_join(cog01, sensors[c("ID", "Description")], by = "ID")
       dat <- inner_join(tidyr::gather(cog01, variable, value, -ID, -Description), selectHandler(), by = "ID")
       #dat <- left_join(dat, sensors[c("ID", "Description")], by = "ID")
@@ -165,7 +165,7 @@ launchApp <- function(prop = 0.01) {
         d <- dat[dat$selected, ]
         p <- p + 
           geom_smooth(data = d,  smoothMap, se = FALSE) +
-          geom_point(data = d, pointMap,alpha = input$alphaSelect) 
+          geom_point(data = d, pointMap, alpha = input$alphaSelect) 
       }
       if (input$facet != "none") {
         p <- p + 
@@ -173,7 +173,7 @@ launchApp <- function(prop = 0.01) {
       }
       l <- plotly_build(ggplotly(p, tooltip = "text"))
       l$data <- lapply(l$data, function(x) { x$type <- "scattergl"; x })
-      l$layout$height <- 600 * max(1, length(unique(pedSample[[input$facet]])))
+      l$layout$height <- 600 * max(1, length(unique(as.list(pedSample)[[input$facet]])))
       l
     })
     
