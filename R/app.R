@@ -62,7 +62,6 @@ launchApp <- function(prop = 0.01) {
           width = 3,
           h4("Time Series controls:"),
           selectInput("x", "Choose an X:", vars, selected = "Hour"),
-          selectInput("filter", "Choose a filter:", c("none", vars), selected = "none"),
           selectInput("facet", "Choose a conditioning:", c("none", vars), selected = "none"),
           numericInput(
             "alphaBase", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
