@@ -16,7 +16,7 @@ library(pedestrians)
 launchApp()
 ```
 
-## Coming soon
+## Demo
 
-A video showing the app in action.
+![](pedestrians.gif)
 
