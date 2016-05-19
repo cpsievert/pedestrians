@@ -16,7 +16,7 @@ pedestrians <- pedestrians %>%
   mutate(Month = month(DateTime)) %>%
   mutate(Day = day(DateTime)) %>%
   mutate(Wday = wday(DateTime)) %>%
-  mutate(Weekend = as.numeric(Wday %in% c(1, 6, 7))) %>%
+  mutate(Weekend = ifelse(Wday %in% c(6, 7), "Weekend", "Weekday")) %>%
   mutate(Hour = hour(DateTime)) %>%
   # minutes are all zero
   #mutate(Minute = minute(DateTime)) %>%
