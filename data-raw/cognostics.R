@@ -44,6 +44,8 @@ pedestrians <- pedestrians %>%
   mutate(Weekend = ifelse(Wday %in% c(6, 7), "Weekend", "Weekday")) %>%
   mutate(Hour = hour(DateTime))
 
+devtools::use_data(pedestrians, overwrite = T)
+
 ## Turn the df to time series
 dates <- sort(unique(pedestrians$DateTime))
 ids <- unique(pedestrians$ID)
