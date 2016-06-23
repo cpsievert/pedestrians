@@ -7,9 +7,10 @@ License: MIT + file LICENSE
 Description: Tools for exploring Melbourne's Pedestrian Data
 URL: https://github.com/cpsievert/pedestrians
 BugReports: https://github.com/cpsievert/pedestrians/issues
+Depends:
+    plotly (>= 4.0.0)
 Imports:
     shiny,
-    plotly,
     leaflet,
     dplyr,
     tourr

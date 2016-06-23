@@ -53,9 +53,6 @@ launchApp <- function(prop = 0.01) {
           selectInput(
             "brushColor", "Selection Color", 
             choices = c("red", "purple", "green", "blue", "yellow")
-          ),
-          numericInput(
-            "alphaSelect", "Alpha transparency", value = 3 / (prop * 1000), min = 0, max = 1
           )
         ),
         column(
@@ -64,7 +61,7 @@ launchApp <- function(prop = 0.01) {
           selectInput("x", "Choose an X:", vars, selected = "Hour"),
           selectInput("facet", "Choose a conditioning:", c("none", vars), selected = "none"),
           numericInput(
-            "alphaBase", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
+            "alpha", "Alpha transparency", value = 1 / (prop * 1000), min = 0, max = 1
           ),
           selectizeInput(
             "tooltip", "Choose variable to show in tooltip", multiple = TRUE,
@@ -83,7 +80,7 @@ launchApp <- function(prop = 0.01) {
         plotlyOutput("pcp")
       )
     ),
-    plotlyOutput("timeSeries")
+    plotlyOutput("timeSeries", height = 700)
   )
   server <- function(input, output, session) {
     
@@ -110,7 +107,7 @@ launchApp <- function(prop = 0.01) {
       if (!is.null(eventData)) {
         # isolate ensures this doesn't get invalidated when brushColor changes
         isolate({
-          selection(eventData, input$brushColor, `|`)
+          selection(eventData, input$brushColor, xor)
         })
       }
       # before returning selection data,
@@ -127,13 +124,15 @@ launchApp <- function(prop = 0.01) {
             label = d$Description, color = d$fill
           )
       }
+      
       dat
     })
     
     output$pcp <- renderPlotly({
+      cog <- pedestrians::cog
       cog01 <- data.frame(
-        pedestrians::cog[, 1], 
-        lapply(pedestrians::cog[, -1], scales::rescale)
+        ID = cog[, "ID"], 
+        lapply(cog[!grepl("^ID$", names(cog))], scales::rescale)
       )
       cog01 <- left_join(cog01, sensors[c("ID", "Description")], by = "ID")
       dat <- inner_join(tidyr::gather(cog01, variable, value, -ID, -Description), selectHandler(), by = "ID")
@@ -143,9 +142,24 @@ launchApp <- function(prop = 0.01) {
         scale_color_identity() + labs(x = NULL, y = NULL) + 
         theme(axis.text.x = element_text(angle = 45), legend.position = "none")
       l <- plotly_build(ggplotly(p, tooltip = "text")) 
-      l$layout$margin$b <- l$layout$margin$b + 20
-      l$layout$dragmode <- "select"
+      l$x$layout$margin$b <- l$layout$margin$b + 20
+      l$x$layout$dragmode <- "select"
       l
+      
+      # TODO: why aren't events firing correctly?!?
+      # dat %>%
+      #   group_by(ID) %>%
+      #   plot_ly(x = ~variable, y = ~value, text = ~Description, key = ~ID,
+      #           color = ~fill, colors = unique(dat$fill)) %>%
+      #   add_lines(hoverinfo = "text") %>% plotly_json()
+      #   layout(
+      #     dragmode = "select",
+      #     hovermode = "closest",
+      #     showlegend = FALSE,
+      #     xaxis = list(title = ""), 
+      #     yaxis = list(title = ""),
+      #     margin = list(b = 50, r = 35)
+      #   )
     })
     
     output$timeSeries <- renderPlotly({
@@ -153,33 +167,23 @@ launchApp <- function(prop = 0.01) {
       dat$tooltip <- apply(dat[input$tooltip], 1, function(x) {
         paste0(colnames(dat[input$tooltip]), ": ", x, collapse = "<br />")
       })
-      pointMap <- aes_string(x = input$x, y = "Counts", color = "fill", text = "tooltip")
-      smoothMap <- aes_string(x = input$x, y = "Counts", color = "fill")
-      d <- dat[!dat$selected, ]
-      p <- ggplot(data = d) + 
-        geom_point(pointMap, alpha = input$alphaBase) + 
-        geom_smooth(smoothMap, se = FALSE) + 
-        labs(x = NULL, y = NULL) + scale_color_identity() 
-      if (any(dat$selected)) {
-        d <- dat[dat$selected, ]
-        p <- p + 
-          geom_smooth(data = d,  smoothMap, se = FALSE) +
-          geom_point(data = d, pointMap, alpha = input$alphaSelect) 
+      mcolor <- toRGB("black", input$alpha)
+      datSelect <- dat[dat$selected, ]
+      
+      p1 <- dat %>% 
+        plot_ly(x = string2formula(input$x), y = ~Counts, text = ~tooltip, hoverinfo = "text") %>%
+        add_markers(marker = list(color = mcolor), name = "All Stations") %>%
+        add_markers(data = datSelect, marker = list(color = ~fill), showlegend = FALSE)
+      
+      if (input$x != "Hour") {
+        return(p1)
       }
-      if (input$facet != "none") {
-        p <- p + 
-          facet_wrap(as.formula(paste("~", input$facet)), ncol = 1, scales = "free")
-      }
-      l <- plotly_build(ggplotly(p, tooltip = "text"))
-      l$data <- lapply(l$data, function(x) { x$type <- "scattergl"; x })
-      l$layout$height <- 600 * max(1, length(unique(as.list(pedSample)[[input$facet]])))
-      l
+      
+      p2 <- ts_summary(input$x, datSelect$ID, datSelect$fill)
+      
+      subplot(p1, p2, nrows = 2, shareX = TRUE)
+      
     })
-    
-    #output$timeSeries2 <- renderUI({
-    #  height <- 600 * max(1, length(unique(pedSample[[input$facet]])))
-    #  plotlyOutput("timeSeries", height = height)
-    #})
     
   }
   shinyApp(ui, server)

@@ -48,11 +48,10 @@ devtools::use_data(pedestrians, overwrite = T)
 
 ## Turn the df to time series
 dates <- sort(unique(pedestrians$DateTime))
-ids <- unique(pedestrians$ID)
-num_ids <- length(ids)
-ts_pedestrians <- matrix(NA, nrow = length(dates), ncol = num_ids)
-for (i in 1L:num_ids) {
-  tmp <- pedestrians %>% filter(ID == i)
+ids <- as.numeric(unique(pedestrians$ID))
+ts_pedestrians <- matrix(NA, nrow = length(dates), ncol = length(ids))
+for (i in seq_along(ids)) {
+  tmp <- subset(pedestrians, ID == ids[i])
   j <- is.element(dates, tmp$DateTime)
   ts_pedestrians[j, i] <- tmp$Counts
 }
@@ -60,6 +59,12 @@ ts_pedestrians <- ts(ts_pedestrians, frequency = 24)
 
 ## Computate cognostics
 cog <- tsmeasures(ts_pedestrians, width = 48) # 7*24 = 2 days window
-# cog <- read_csv("data-raw/pedestrian-cognostics.csv")
-names(cog) <- c("ID", names(cog)[-1])
+cog <- as.data.frame(cog)
+cog$ID <- factor(ids)
 devtools::use_data(cog, overwrite = TRUE)
+
+
+## TODO: where does the sensors data come from?
+sensors$ID <- factor(sensors$ID)
+sensors <- dplyr::semi_join(sensors, pedestrians, by = "ID")
+devtools::use_data(sensors, overwrite = TRUE)
