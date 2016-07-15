@@ -18,5 +18,5 @@ launchApp()
 
 ## Demo
 
-![](pedestrians.gif)
+![](http://imgur.com/WPMx6bg.gif)
 
