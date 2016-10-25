@@ -42,7 +42,7 @@ p2 <- ggplotly(gg, tooltip = "text", height = 800) %>%
     dragmode = "zoom"
   )
 
-s <- subplot(p1, p2, titleX = TRUE) %>%
+s <- subplot(p1, p2, titleX = TRUE, widths = c(0.3, 0.7)) %>%
   layout(
     margin = list(l = 300, b = 50), 
     barmode = "overlay"

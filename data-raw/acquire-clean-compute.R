@@ -66,8 +66,9 @@ ts_pedestrians <- pedestrians %>%
   select(DateTime, Name, Counts) %>%
   spread(Name, Counts) %>%
   select(-DateTime) %>%
-  xts::xts(allHours, frequency = 24)
-
+  as.matrix() %>% 
+  ts(frequency = 24)
+  
 ## Compute cognostics
 cog <- tsmeasures(ts_pedestrians, width = 48) # 7*24 = 2 days window
 rownames(cog) <- colnames(ts_pedestrians)
