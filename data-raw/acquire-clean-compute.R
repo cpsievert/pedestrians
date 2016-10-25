@@ -35,6 +35,7 @@ names(sensors) <- sub("Sensor ", "", names(sensors), fixed = T)
 sensors <- sensors %>%
   mutate(Name = Description) %>%
   select(-Description)
+devtools::use_data(sensors, overwrite = TRUE)
 
 # make sure we have location data for every sensor!
 missingSensors <- setdiff(unique(pedestrians$Name), sensors$Name)
