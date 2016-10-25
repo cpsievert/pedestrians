@@ -1,0 +1,8 @@
+---
+title: "Pedestrians"
+output: html_document
+---
+
+This website hosts a number of interactive graphics for exploring the City Melbourne's pedestrian data. You can find the code used to generate the following examples [here](https://github.com/cpsievert/pedestrians):
+
+* [Missingness by time](missing-by-time)
