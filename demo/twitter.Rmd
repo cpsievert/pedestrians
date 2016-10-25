@@ -1,0 +1,125 @@
+---
+title: "plotly + leaflet + crosstalk = `r remoji::emoji('heart_eyes_cat')`"
+output:
+  html_document:
+    code_folding: hide
+---
+
+This is a working example showing how we can perform linked highlighting between plotly and leaflet (see [a video](http://i.imgur.com/EJhhPy0.gif) of it in action). Plotly itself has extensive support for linked highlighting where interaction types, colors, and persistent/transient selection can be specified via the `highlight()` function. See a growing set of examples [here](https://github.com/jcheng5/plotly/tree/joe/feature/crosstalk/inst/examples/crosstalk)
+
+**DISCLAIMER:** This is very experimental, and requires development versions of several packages. Press the "code" buttons to see how to install and create this example.
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+# A standalone HTML version of launchApp()
+
+# devtools::install_github("rstudio/leaflet@56eb3ecbb25ddc195c1cc6f530246dbb565f99ee")
+library(leaflet)
+# devtools::install_github("ropensci/plotly@dce5a288b2b7daddf3884b4f57dbfa4e02b9fab8")
+library(plotly)
+library(crosstalk)
+library(htmltools)
+library(dplyr)
+library(tidyr)
+
+data(pedestrians, package = "pedestrians")
+data(sensors, package = "pedestrians")
+data(cog, package = "pedestrians")
+
+# put all the cognostics on a 0-1 scale
+cogVars <- setdiff(names(cog), "ID") 
+for (i in cogVars) {
+  cog[[i]] <- scales::rescale(cog[[i]])
+}
+# attach the sensor description
+cog <- dplyr::left_join(cog, sensors[c("ID", "Description")], "ID")
+
+# random sample (needed for performance/speed)
+n <- nrow(pedestrians)
+pedSample <- pedestrians[sample(n, n * 0.01), ]
+
+# Use the ID field as the shared key
+pedestrians <- SharedData$new(pedestrians, key = ~ID, group = "melb")
+pedSample <- SharedData$new(pedSample, key = ~ID, group = "melb")
+sensors <- SharedData$new(sensors, key = ~ID, group = "melb")
+cog <- SharedData$new(cog, key = ~ID, group = "melb")
+
+# let leaflet know that selections should persist
+options(persistent = TRUE)
+
+# plot 1
+p1 <- sensors %>%
+  leaflet(height = 200) %>% 
+  addTiles() %>% 
+  fitBounds(
+    ~min(Longitude), ~min(Latitude), ~max(Longitude), ~max(Latitude)
+  ) %>%
+  addCircleMarkers(
+    ~Longitude, ~Latitude, layerId = ~ID, label = ~Description, color = "black"
+  )
+
+# plot 2
+p <- cog %>%
+  plot_ly(height = 200) %>% 
+  gather_("variable", "value", cogVars) %>%
+  ggplot(aes(variable, value, group = ID, text = Description)) + 
+  geom_line() + geom_point(size = 0.01) + 
+  theme(axis.text.x = element_text(angle = 45)) + 
+  labs(x = NULL, y = NULL)
+
+p2 <- p %>%
+  ggplotly(tooltip = "Description", height = 200) %>%
+  layout(dragmode = "select", margin = list(b = 70)) %>%
+  highlight(dynamic = TRUE, persistent = TRUE)
+
+# plot 3
+p3 <- pedSample %>%
+  plot_ly(x = ~Hour, y = ~Counts, 
+          color = I("black"), alpha = 0.01, height = 200) %>% 
+  toWebGL() %>%
+  highlight(opacityDim = 1, persistent = TRUE)
+
+# plot 4 (IQR ribbons)
+tidyIQR <- function(data, groups = NULL) {
+  if (is.SharedData(data)) data <- data$origData()
+  for (i in groups) {
+    data <- group_by_(data, i, add = TRUE)
+  }
+  summarise(
+    data,
+    min = min(Counts),
+    q1 = quantile(Counts, 0.25),
+    med = median(Counts),
+    q3 = quantile(Counts, 0.75),
+    max = max(Counts)
+  )
+}
+
+byHour <- tidyIQR(pedestrians, "Hour")
+byHourID <- tidyIQR(pedestrians, c("Hour", "ID"))
+byHourID <- SharedData$new(byHourID, ~ID, "melb")
+
+p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 200) %>%
+  add_ribbons(ymin = ~q1, ymax = ~q3) %>%
+  add_lines(y = ~med) %>%
+  add_data(byHourID) %>%
+  group_by(ID) %>%
+  add_ribbons(ymin = ~q1, ymax = ~q3, color = I("red")) %>%
+  add_lines(y = ~med, color = I("red")) %>%
+  highlight(defaultValues = 1, opacityDim = 0, persistent = TRUE) %>%
+  hide_legend()
+
+browsable(tags$div(
+  style = "display: flex; flex-wrap: wrap",
+  tagList(
+    tags$div(p1, style = "width: 50%; padding: 1em; border: solid;"),
+    tags$div(p2, style = "width: 50%; padding: 1em; border: solid;"),
+    tags$div(p3, style = "width: 50%; padding: 1em; border: solid;"),
+    tags$div(p4, style = "width: 50%; padding: 1em; border: solid;")
+  )
+))
+```
