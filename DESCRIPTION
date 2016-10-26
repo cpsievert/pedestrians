@@ -7,16 +7,17 @@ License: MIT + file LICENSE
 Description: Tools for exploring Melbourne's Pedestrian Data
 URL: https://github.com/cpsievert/pedestrians
 BugReports: https://github.com/cpsievert/pedestrians/issues
-Depends:
-    plotly (>= 4.0.0)
-Imports:
-    shiny,
+Suggests:
+    plotly (>= 4.0.0),
     leaflet,
     dplyr,
-    tourr
+    tidyr,
+    tourr,
+    shiny,
+    htmltools,
+    crosstalk
 Suggests: knitr
 LazyData: true
 VignetteBuilder: knitr
-Remotes: rstudio/leaflet,
-    ropensci/plotly@feature/transition
+Remotes: ropensci/plotly#554
 RoxygenNote: 5.0.1

@@ -1,5 +1,9 @@
 #' Launch shiny app for exploring pedestrian data
 #' 
+#' Using this function is not recommended (at least currently).
+#' Visit the website for examples like this shiny app that don't
+#' require shiny -- \url{http://cpsievert.github.io/pedestrians}
+#' 
 #' @param prop what proportion of the raw data should be displayed?
 #' 
 #' @export
@@ -49,7 +53,7 @@ launchApp <- function(prop = 0.01) {
         column(
           width = 2,
           h4("Selection controls:"),
-          checkboxInput("persist", "Persistent Selections", value = FALSE),
+          checkboxInput("persist", "Persistent Selections", value = TRUE),
           selectInput(
             "brushColor", "Selection Color", 
             choices = c("red", "purple", "green", "blue", "yellow")
@@ -107,7 +111,7 @@ launchApp <- function(prop = 0.01) {
       if (!is.null(eventData)) {
         # isolate ensures this doesn't get invalidated when brushColor changes
         isolate({
-          selection(eventData, input$brushColor, xor)
+          selection(eventData, input$brushColor, `|`)
         })
       }
       # before returning selection data,

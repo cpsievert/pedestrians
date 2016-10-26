@@ -10,7 +10,9 @@ launchApp(prop = 0.01)
 \item{prop}{what proportion of the raw data should be displayed?}
 }
 \description{
-Launch shiny app for exploring pedestrian data
+Using this function is not recommended (at least currently).
+Visit the website for examples like this shiny app that don't
+require shiny -- \url{http://cpsievert.github.io/pedestrians}
 }
 \examples{
 \dontrun{

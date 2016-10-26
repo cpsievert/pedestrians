@@ -1,5 +1,3 @@
-# A standalone HTML version of launchApp()
-
 # devtools::install_github("rstudio/leaflet@56eb3ecbb25ddc195c1cc6f530246dbb565f99ee")
 library(leaflet)
 # devtools::install_github("ropensci/plotly@dce5a288b2b7daddf3884b4f57dbfa4e02b9fab8")
@@ -14,16 +12,23 @@ data(pedestrians, package = "pedestrians")
 data(sensors, package = "pedestrians")
 data(cog, package = "pedestrians")
 
-
 # tour of time-series cognostics
 # TODO: try touring a PCA of the actual time-series
-cog01 <- rescale(cog)
+cogVars <- colnames(cog)
+cog01 <- rescale(cog[, cogVars])
 tour <- new_tour(cog01, grand_tour(), NULL)
 
 tour_dat <- function(step_size) {
   step <- tour(step_size)
   proj <- center(cog01 %*% step$proj)
-  data.frame(x = proj[,1], y = proj[,2], Name = rownames(cog))
+  data.frame(x = proj[,1], y = proj[,2], Name = rownames(cog01))
+}
+
+proj_dat <- function(step_size) {
+  step <- tour(step_size)
+  data.frame(
+    x = step$proj[,1], y = step$proj[,2], measure = colnames(cog01)
+  )
 }
 
 steps <- c(0, rep(1/15, 500))
@@ -34,20 +39,39 @@ tour_dats <- lapply(steps, tour_dat)
 tour_datz <- Map(function(x, y) cbind(x, step = y), tour_dats, stepz)
 tour_dat <- dplyr::bind_rows(tour_datz)
 
+# tidy version of tour projection data
+proj_dats <- lapply(steps, proj_dat)
+proj_datz <- Map(function(x, y) cbind(x, step = y), proj_dats, stepz)
+proj_dat <- dplyr::bind_rows(proj_datz)
+
 ax <- list(
-  title = "", range = c(-1, 1), zeroline = FALSE
+  title = "", range = c(-1.1, 1.1), 
+  zeroline = F, showticklabels = F
 )
 
-options(digits = 3)
+#options(digits = 3)
 
 tour <- tour_dat %>%
   SharedData$new(~Name, group = "melb") %>%
-  plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black"), height = 250, width = 250) %>%
+  plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black"), 
+          height = 300, width = 600) %>%
   add_markers(text = ~Name, hoverinfo = "text") %>%
-  hide_legend() %>%
-  layout(xaxis = ax, yaxis = ax) %>%
+  layout(xaxis = ax, yaxis = ax)
+
+axes <- proj_dat %>%
+  plot_ly(x = ~x, y = ~y, frame = ~step, hoverinfo = "none") %>%
+  add_segments(xend = 0, yend = 0, color = I("gray85")) %>%
+  add_text(text = ~measure, color = I("black")) %>%
+  layout(xaxis = ax, yaxis = ax)
+
+# very important these animation options are specified _after_ subplot()
+# since they call plotly_build(., registerFrames = T)
+tour <- subplot(tour, axes, nrows = 1, shareY = T, margin = 0) %>% 
   animationOpts(33, 0) %>%
-  animationSlider(hide = TRUE)
+  animationSlider(hide = TRUE) %>%
+  hide_legend() %>%
+  layout(dragmode = "select") %>%
+  highlight(persistent = TRUE)
 
 # set some crosstalk options for leaflet 
 options(opacityDim = 0.5, persistent = TRUE)
@@ -56,18 +80,18 @@ options(opacityDim = 0.5, persistent = TRUE)
 mapRatio <- with(sensors, diff(range(Longitude)) / diff(range(Latitude)))
 
 map <- sensors %>%
-  SharedData$new(~Description, group = "melb") %>%
+  SharedData$new(~Name, group = "melb") %>%
   leaflet(height = 250, width = 250 * mapRatio) %>% 
   addTiles() %>% 
   fitBounds(
     ~min(Longitude), ~min(Latitude), ~max(Longitude), ~max(Latitude)
   ) %>%
   addCircleMarkers(
-    ~Longitude, ~Latitude, layerId = ~Description, label = ~Description, color = "black"
+    ~Longitude, ~Latitude, layerId = ~Name, label = ~Name, color = "black"
   )
 
 # "standardized" (i.e., mean 0, std dev 1) cognostics
-cogSTD <- cog %>%
+cogSTD <- cog[, cogVars] %>%
   scale() %>%
   data.frame(stringsAsFactors = F) %>%
   mutate(Name = rownames(.)) %>%
@@ -144,35 +168,33 @@ p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 250) %>%
   highlight(off = "plotly_doubleclick", opacityDim = 0, persistent = TRUE) %>%
   hide_legend()
 
-# why does this blow up?
-#p5 <- pedSample %>%
-#  SharedData$new(~Name, group = "melb") %>%
-#  plot_ly(x = ~lubridate::yday(DateTime) + Hour / 24, 
-#              y = ~Counts, height = 250) %>%
-#  group_by(Name, Year) %>%
-#  add_lines(alpha = 0.02, color = I("black")) %>%
-#  layout(
-#    title = "Raw Counts (randomly sampled)",
-#    yaxis = list(title = ""), 
-#    xaxis = list(title = "Day of year"),
-#    dragmode = "zoom"
-#  ) %>%
-#  highlight(off = "plotly_doubleclick", defaultValues = 1, persistent = TRUE) %>%
-#  rangeslider()
-#
-miniflex <- tags$div(
-  style = "display: flex; flex-wrap: wrap",
-  tags$div(map, style = "width: 50%"),
-  tags$div(tour, style = "width: 50%")
-)
+# TODO: why does take so long with plot_ly()?
+gg <- pedSample %>%
+  SharedData$new(~Name, group = "melb") %>%
+  ggplot(aes(x = lubridate::yday(DateTime) + Hour / 24, text = Name,
+             y = Counts, group = interaction(Name, Year))) +
+  geom_line(alpha = 0.1) +
+  facet_wrap(~Year, ncol = 1) +
+  labs(x = NULL, y = NULL)
+  
+p5 <- ggplotly(gg, tooltip = "text", height = 800) %>%
+  layout(
+    title = "Raw Counts (randomly sampled)",
+    yaxis = list(title = ""), 
+    xaxis = list(title = "Day of year"),
+    dragmode = "zoom"
+  ) %>%
+  highlight(off = "plotly_doubleclick", defaultValues = 1, persistent = TRUE)
+  
 
 browsable(tags$div(
   style = "display: flex; flex-wrap: wrap",
-  tags$div(miniflex, align = "center", style = "width: 50%; padding: 1em; border: solid;"),
-  tags$div(p2, style = "width: 50%; padding: 1em; border: solid;"),
+  tags$div(map, style = "width: 20%; padding: 1em; border: solid;"),
+  tags$div(tour, style = "width: 40%; padding: 1em; border: solid;"),
+  tags$div(p2, style = "width: 40%; padding: 1em; border: solid;"),
   tags$div(p3, style = "width: 50%; padding: 1em; border: solid;"),
-  tags$div(p4, style = "width: 50%; padding: 1em; border: solid;")#,
-  #tags$div(p5, style = "width: 100%; padding: 1em; border: solid;")
+  tags$div(p4, style = "width: 50%; padding: 1em; border: solid;"),
+  tags$div(p5, style = "width: 100%; padding: 1em; border: solid;")
 ))
 
 
