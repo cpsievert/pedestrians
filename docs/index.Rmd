@@ -7,3 +7,4 @@ This website hosts a number of interactive graphics for exploring the City Melbo
 
 * [Missingness by time](missing-by-time)
 * [`stl()` tour](stl-tour)
+* [cognostics tour](cog-tour)
