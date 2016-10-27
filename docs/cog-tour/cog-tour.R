@@ -8,6 +8,9 @@ library(dplyr)
 library(tidyr)
 library(tourr)
 
+# for reproducing the sampled counts
+set.seed(9)
+
 data(pedestrians, package = "pedestrians")
 data(sensors, package = "pedestrians")
 data(cog, package = "pedestrians")
