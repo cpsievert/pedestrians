@@ -54,7 +54,7 @@ ax <- list(
 tour <- tour_dat %>%
   SharedData$new(~Name, group = "melb") %>%
   plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black"), 
-          height = 300, width = 600) %>%
+          height = 350, width = 700) %>%
   add_markers(text = ~Name, hoverinfo = "text") %>%
   layout(xaxis = ax, yaxis = ax)
 
@@ -165,7 +165,7 @@ p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 250) %>%
     xaxis = list(title = "Hour of Day"),
     dragmode = "zoom"
   ) %>%
-  highlight(off = "plotly_doubleclick", opacityDim = 0, persistent = TRUE) %>%
+  highlight(off = NULL, opacityDim = 0, persistent = TRUE) %>%
   hide_legend()
 
 # TODO: why does take so long with plot_ly()?
@@ -189,9 +189,9 @@ p5 <- ggplotly(gg, tooltip = "text", height = 800) %>%
 
 browsable(tags$div(
   style = "display: flex; flex-wrap: wrap",
-  tags$div(map, style = "width: 20%; padding: 1em; border: solid;"),
-  tags$div(tour, style = "width: 40%; padding: 1em; border: solid;"),
-  tags$div(p2, style = "width: 40%; padding: 1em; border: solid;"),
+  tags$div(map, style = "width: 20%; padding: 1em"),
+  tags$div(tour, style = "width: 40%; padding: 1em"),
+  tags$div(p2, style = "width: 40%; padding: 1em"),
   tags$div(p3, style = "width: 50%; padding: 1em; border: solid;"),
   tags$div(p4, style = "width: 50%; padding: 1em; border: solid;"),
   tags$div(p5, style = "width: 100%; padding: 1em; border: solid;")

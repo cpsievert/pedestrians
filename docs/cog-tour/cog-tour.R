@@ -81,8 +81,8 @@ mapRatio <- with(sensors, diff(range(Longitude)) / diff(range(Latitude)))
 
 map <- sensors %>%
   SharedData$new(~Name, group = "melb") %>%
-  leaflet(height = 250, width = 250 * mapRatio) %>% 
-  addTiles() %>% 
+  leaflet(height = 300, width = 300 * mapRatio) %>% 
+  addTiles(attribution = FALSE) %>% 
   fitBounds(
     ~min(Longitude), ~min(Latitude), ~max(Longitude), ~max(Latitude)
   ) %>%
@@ -100,14 +100,13 @@ cogSTD <- cog[, cogVars] %>%
 # TODO: get this working in pure plot_ly() (needs a fix for building group index when x is categorical)
 p <- cogSTD %>%
   SharedData$new(~Name, group = "melb") %>%
-  plot_ly(height = 250) %>% 
   ggplot(aes(variable, value, group = Name, text = Name)) + 
-  geom_line() + geom_point(size = 0.01) + 
-  theme(axis.text.x = element_text(angle = 45)) + 
-  labs(x = NULL, y = NULL)
+    geom_line() + geom_point(size = 0.01) + 
+    labs(x = NULL, y = NULL) + theme_bw() +
+    theme(axis.text.x = element_text(angle = 45)) 
 
 p2 <- p %>%
-  ggplotly(tooltip = "text", height = 250) %>%
+  ggplotly(tooltip = "text", height = 300) %>%
   layout(dragmode = "select", margin = list(b = 70)) %>%
   highlight(off = "plotly_deselect", dynamic = TRUE, persistent = TRUE)
 
@@ -171,11 +170,11 @@ p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 250) %>%
 # TODO: why does take so long with plot_ly()?
 gg <- pedSample %>%
   SharedData$new(~Name, group = "melb") %>%
-  ggplot(aes(x = lubridate::yday(DateTime) + Hour / 24, text = Name,
+  ggplot(aes(x = lubridate::yday(DateTime) + Hour / 24, text = paste(Name, "<br />", DateTime), 
              y = Counts, group = interaction(Name, Year))) +
-  geom_line(alpha = 0.1) +
+  geom_line(alpha = 0.2) +
   facet_wrap(~Year, ncol = 1) +
-  labs(x = NULL, y = NULL)
+  labs(x = NULL, y = NULL) + theme_bw()
 
 p5 <- ggplotly(gg, tooltip = "text", height = 800) %>%
   layout(
@@ -186,18 +185,15 @@ p5 <- ggplotly(gg, tooltip = "text", height = 800) %>%
   ) %>%
   highlight(off = "plotly_doubleclick", defaultValues = 1, persistent = TRUE)
 
-
 html <- tags$div(
   style = "display: flex; flex-wrap: wrap",
-  tags$div(map, style = "width: 20%; padding: 1em"),
-  tags$div(tour, style = "width: 40%; padding: 1em"),
+  tags$div(map, style = "width: 22%; padding: 1em"),
+  tags$div(tour, style = "width: 38%; padding: 1em"),
   tags$div(p2, style = "width: 40%; padding: 1em"),
   tags$div(p3, style = "width: 50%; padding: 1em; border: solid;"),
   tags$div(p4, style = "width: 50%; padding: 1em; border: solid;"),
   tags$div(p5, style = "width: 100%; padding: 1em; border: solid;")
 )
-
-
 
 # opens in an interactive session
 res <- html_print(html)
