@@ -156,8 +156,8 @@ p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 250) %>%
   add_lines(y = ~med) %>%
   add_data(byHourID) %>%
   group_by(Name) %>%
-  add_ribbons(ymin = ~q1, ymax = ~q3, color = I("red"), alpha = 0.5) %>%
-  add_lines(y = ~med, color = I("red")) %>%
+  add_ribbons(ymin = ~q1, ymax = ~q3, alpha = 0.5) %>%
+  add_lines(y = ~med) %>%
   layout(
     title = "IQR by station vs overall",
     yaxis = list(title = ""), 

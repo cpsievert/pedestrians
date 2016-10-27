@@ -80,12 +80,11 @@ cogSTD <- cog[, cogVars] %>%
 # TODO: get this working in pure plot_ly() (needs a fix for building group index when x is categorical)
 p <- cogSTD %>%
   SharedData$new(~Name, group = "melb") %>%
-  plot_ly(height = 400) %>% 
   ggplot(aes(variable, value, group = Name, text = Name)) + 
-  geom_line() + geom_point(size = 0.01) + 
-  theme(axis.text.x = element_text(angle = 45)) + 
-  labs(x = NULL, y = NULL)
-
+    geom_line() + geom_point(size = 0.01) + 
+    theme_bw() + labs(x = NULL, y = NULL) +
+    theme(axis.text.x = element_text(angle = 45))
+  
 p2 <- p %>%
   ggplotly(tooltip = "text", height = 400) %>%
   layout(dragmode = "select", margin = list(b = 70)) %>%
@@ -138,8 +137,8 @@ p4 <- plot_ly(byHour, x = ~Hour, color = I("black"), height = 400) %>%
   add_lines(y = ~med) %>%
   add_data(byHourID) %>%
   group_by(Name) %>%
-  add_ribbons(ymin = ~q1, ymax = ~q3, color = I("red"), alpha = 0.5) %>%
-  add_lines(y = ~med, color = I("red")) %>%
+  add_ribbons(ymin = ~q1, ymax = ~q3, alpha = 0.5) %>%
+  add_lines(y = ~med) %>%
   layout(
     title = "IQR by station vs overall",
     yaxis = list(title = ""), 
