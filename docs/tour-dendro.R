@@ -1,6 +1,6 @@
-# devtools::install_github("rstudio/leaflet@56eb3ecbb25ddc195c1cc6f530246dbb565f99ee")
+# devtools::install_github("rstudio/leaflet#281")
 library(leaflet)
-# devtools::install_github("ropensci/plotly@dce5a288b2b7daddf3884b4f57dbfa4e02b9fab8")
+# devtools::install_github("ropensci/plotly#554")
 library(plotly)
 library(crosstalk)
 library(htmltools)
@@ -31,7 +31,7 @@ proj_dat <- function(step_size) {
   )
 }
 
-steps <- c(0, rep(1/15, 100))
+steps <- c(0, rep(1/15, 1000))
 stepz <- cumsum(steps)
 
 # tidy version of tour data
@@ -153,7 +153,10 @@ dendro <- cog %>%
   as.dendrogram() %>%
   plot_dendro(set = "melb", xmin = -15.5) %>%
   hide_legend() %>%
-  highlight(off = "plotly_deselect", dynamic = TRUE, persistent = TRUE)
+  highlight(
+    off = "plotly_deselect", persistent = TRUE, dynamic = TRUE,
+    color = RColorBrewer::brewer.pal(8, "Set1")
+  )
 
 html <- tags$div(
   style = "display: flex; flex-wrap: wrap",

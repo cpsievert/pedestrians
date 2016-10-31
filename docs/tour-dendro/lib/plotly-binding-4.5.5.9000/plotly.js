@@ -471,8 +471,12 @@ TraceManager.prototype.updateSelection = function(group, keys) {
         trace.line.color = selectionColour || trace.line.color;
         trace.textfont = trace.textfont || {};
         trace.textfont.color = selectionColour || trace.textfont.color;
+        trace.selected = true;
         traces.push(trace);
-        // dim opacity of original traces (if they aren't already)
+        // dim opacity of "non-selection" traces (if they aren't already)
+        if (this.gd.data[i].selected) {
+          continue;
+        }
         if (!trace.dimmed) {
           var opacity = this.origData[i].opacity * this.highlight.opacityDim;
           Plotly.restyle(this.gd, {"opacity": opacity}, i);
@@ -486,6 +490,7 @@ TraceManager.prototype.updateSelection = function(group, keys) {
     for (var k = this.gd.data.length; k < this.gd.data.length + traces.length; k++) {
       newTracesIndex.push(k);
     }
+    console.log(newTracesIndex);
     
     if (traces.length > 0) {
       
