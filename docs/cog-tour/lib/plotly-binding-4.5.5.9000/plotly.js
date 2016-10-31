@@ -168,8 +168,10 @@ HTMLWidgets.widget({
       if (!curveObj.key || !curveObj.set) {
         continue;
       }
-      for (var pointIdx = 0; pointIdx < curveObj.key.length; pointIdx++) {
-        keyCache[joinSetAndKey(curveObj.set, curveObj.key[pointIdx])] =
+      // collapse nested keys (object of arrays -> array)
+      var key = collapseKey(curveObj.key);
+      for (var pointIdx = 0; pointIdx < key.length; pointIdx++) {
+        keyCache[joinSetAndKey(curveObj.set, key[pointIdx])] =
           {curveNumber: curve, pointNumber: pointIdx};
       }
     }
@@ -184,10 +186,22 @@ HTMLWidgets.widget({
           // If this curve isn't mapped to a set, ignore this point.
           continue;
         }
-        // Look up the keys
-        var key = curveObj.key[points[i].pointNumber];
+        
         keysBySet[curveObj.set] = keysBySet[curveObj.set] || [];
-        keysBySet[curveObj.set].push(key);
+        
+        // key can be a object of arrays (nested keys)
+        if (typeof(curveObj.key) === "object") {
+          var keyNames = Object.keys(curveObj.key);
+          var key = curveObj.key[keyNames[points[i].pointNumber]];
+          keysBySet[curveObj.set] = keysBySet[curveObj.set].concat(key);
+        } else if (Array.isArray(curveObj.key)) {
+          var key = curveObj.key[points[i].pointNumber];
+          keysBySet[curveObj.set].push(key);
+        } else {
+          throw new Error("key attribute must be a key or object");
+        }
+        
+        
       }
       return keysBySet;
     }
@@ -247,7 +261,35 @@ HTMLWidgets.widget({
       // On plotly event, update crosstalk variable selection value
       graphDiv.on(x.highlight.on, function turnOn(e) {
         if (e) {
+          // TODO: generalize this to multiple traces/points!!
+          /*
+          var gd = document.getElementById(el.id);
+          var nPoints = e.points.length;
+          var points = [];
+          for (var i = 0; i < nPoints; i++) {
+            var pt = e.points[i];
+            var key = gd.data[pt.curveNumber].key;
+            // if an object, this is a nested key selection
+            if (typeof(key) !== "object") {
+              points.push(pt);
+              continue;
+            }
+            key = key[Object.keys(key)[pt.pointNumber]];
+            // add new event points (one for each key)
+            for (var j = 0; j < key.length; j++) {
+              var newPoint = JSON.parse(JSON.stringify(pt));
+              newPoint.key = key[j];
+              points.push(newPoint);
+            }
+          }
+          console.log(points);
+          */
+          
+          
+          
+          
           var selectedKeys = pointsToKeys(e.points);
+          console.log(selectedKeys);
           // Keys are group names, values are array of selected keys from group.
           for (var set in selectedKeys) {
             if (selectedKeys.hasOwnProperty(set)) {
@@ -467,8 +509,15 @@ TraceManager.prototype.updateSelection = function(group, keys) {
           var line = this.gd._fullData[i].line || {};
           Plotly.restyle(this.gd.id, {'line.color': line.color}, i);
         }
+        trace.text = this.gd._fullData[i].text || {};
+        var suppliedText = this.gd.data[i].text || {};
+        if (suppliedText.color !== trace.text.color) {
+          var text = this.gd._fullData[i].text || {};
+          Plotly.restyle(this.gd.id, {'text.color': text.color}, i);
+        } 
         trace.marker.color =  selectionColour || trace.marker.color;
         trace.line.color = selectionColour || trace.line.color;
+        trace.text.color = selectionColour || trace.text.color;
         traces.push(trace);
         // dim opacity of original traces (if they aren't already)
         if (!trace.dimmed) {
@@ -558,6 +607,7 @@ Set.prototype.remove = function(val) {
 
 function findMatches(haystack, needleSet) {
   var matches = [];
+  haystack = collapseKey(haystack);
   haystack.forEach(function(obj, i) {
     if (needleSet.has(obj) || obj === null) {
       matches.push(i);
@@ -611,4 +661,16 @@ function removeBrush(el) {
   for (var i = 0; i < outlines.length; i++) {
     outlines[i].remove();
   }
+}
+
+function collapseKey(obj) {
+  if (typeof(obj) !== "object") {
+    return obj;  
+  }
+  var keyNames = Object.keys(obj);
+  var res = [];
+  for (var i = 0; i < keyNames.length; i++) {
+    res.concat(obj[keyNames[i]]);
+  }
+  return res;
 }
