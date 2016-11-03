@@ -23,6 +23,8 @@ HTMLWidgets.widget({
 
   resize: function(el, width, height, instance) {
     if (instance.autosize) {
+      var width = instance.width || width;
+      var height = instance.height || height;
       Plotly.relayout(el.id, {width: width, height: height});
     }
   },  
@@ -47,17 +49,15 @@ HTMLWidgets.widget({
     // if no plot exists yet, create one with a particular configuration
     if (!instance.plotly) {
       
-      var plot = Plotly.plot(graphDiv, x.data, x.layout, x.config).then(function() {
-        Plotly.addFrames(graphDiv, x.frames);
-      });
+      var plot = Plotly.plot(graphDiv, x);
       instance.plotly = true;
-      instance.autosize = x.layout.autosize;
+      instance.autosize = x.layout.autosize || true;
+      instance.width = x.layout.width;
+      instance.height = x.layout.height;
       
     } else {
       
-      var plot = Plotly.newPlot(graphDiv, x.data, x.layout).then(function() {
-        Plotly.addFrames(graphDiv, x.frames);
-      });
+      var plot = Plotly.newPlot(graphDiv, x);
       
     }
     
@@ -237,11 +237,14 @@ HTMLWidgets.widget({
 
     var traceManager = new TraceManager(graphDiv, x.highlight);
 
-    // Gather all sets.
+    // Gather all *unique* sets.
     var allSets = [];
     for (var curveIdx = 0; curveIdx < x.data.length; curveIdx++) {
-      if (x.data[curveIdx].set) {
-        allSets.push(x.data[curveIdx].set);
+      var newSet = x.data[curveIdx].set;
+      if (newSet) {
+        if (allSets.indexOf(newSet) === -1) {
+          allSets.push(newSet);
+        }
       }
     }
 
@@ -453,30 +456,23 @@ TraceManager.prototype.updateSelection = function(group, keys) {
         trace.hoverinfo = this.highlight.hoverinfo || trace.hoverinfo;
         trace.name = "selected";
         // inherit marker/line attributes from the existing trace
-        trace.marker = this.gd._fullData[i].marker || {};
-        // prevent Plotly.addTraces() from changing color of original traces
-        // (happens if user doesn't specify trace color)
-        var suppliedMarker = this.gd.data[i].marker || {};
-        if (suppliedMarker.color !== trace.marker.color) {
-          var marker = this.gd._fullData[i].marker || {};
-          Plotly.restyle(this.gd.id, {'marker.color': marker.color}, i);
+        var d = this.gd._fullData[i];
+        if (d.marker) {
+          trace.marker = d.marker;
+          trace.marker.color =  selectionColour || trace.marker.color;
         }
-        trace.line = this.gd._fullData[i].line || {};
-        var suppliedLine = this.gd.data[i].line || {};
-        if (suppliedLine.color !== trace.line.color) {
-          var line = this.gd._fullData[i].line || {};
-          Plotly.restyle(this.gd.id, {'line.color': line.color}, i);
+        if (d.line) {
+          trace.line = d.line;
+          trace.line.color =  selectionColour || trace.line.color;
         }
-        trace.marker.color =  selectionColour || trace.marker.color;
-        trace.line.color = selectionColour || trace.line.color;
-        trace.textfont = trace.textfont || {};
-        trace.textfont.color = selectionColour || trace.textfont.color;
-        trace.selected = true;
+        if (d.textfont) {
+          trace.textfont = d.textfont;
+          trace.textfont.color =  selectionColour || trace.textfont.color;
+        }
+        
+        trace._crosstalkIndex = i;
         traces.push(trace);
-        // dim opacity of "non-selection" traces (if they aren't already)
-        if (this.gd.data[i].selected) {
-          continue;
-        }
+        // dim opacity of original traces (if they aren't already)
         if (!trace.dimmed) {
           var opacity = this.origData[i].opacity * this.highlight.opacityDim;
           Plotly.restyle(this.gd, {"opacity": opacity}, i);
@@ -485,55 +481,68 @@ TraceManager.prototype.updateSelection = function(group, keys) {
       }
     }
     
-    // trace indices for the new traces
-    var newTracesIndex = [];
-    for (var k = this.gd.data.length; k < this.gd.data.length + traces.length; k++) {
-      newTracesIndex.push(k);
-    }
-    console.log(newTracesIndex);
+    
     
     if (traces.length > 0) {
       
-      // add the new traces
-      Plotly.addTraces(this.gd, traces, newTracesIndex);
+      var nOrigTraces = this.origData.length;
+      var nCurrentTraces = this.gd._fullData.length;
       
-      // add selection traces to frames
-      var frames = this.gd._transitionData._frames || [];
-      for (var i = 0; i < frames.length; i++) {
+      Plotly.addTraces(this.gd, traces).then(function(gd) {
+        // incrementally add selection traces to frames
+        // (this is heavily inspired by Plotly.Plots.modifyFrames() 
+        // in src/plots/plots.js)
+        var _hash = gd._transitionData._frameHash;
+        var _frames = gd._transitionData._frames || [];
         
-        // add the new trace indices
-        for (var k = 0; k < newTracesIndex.length; k++) {
-          frames[i].traces.push(newTracesIndex[k]);
-        }
-        
-        // append the new traces 
-        var frame = frames[i];
-        var nTraces = frame.data.length;
-        for (var j = 0; j < nTraces; j++) {
-          var trace = frame.data[j];
-          if (!trace.key || trace.set !== group) {
-            continue;
+        for (var i = 0; i < _frames.length; i++) {
+          
+          // create a lookup table mapping trace index of *selected* traces 
+          // and their *original* index
+          var origIdx = [];
+          var newIdx = [];
+          for (var j = 0; j < traces.length; j++) {
+            var idx = traces[j]._crosstalkIndex;
+            if (_frames[i].traces.indexOf(idx) > -1) {
+              origIdx.push(idx);
+              newIdx.push(nCurrentTraces + j);
+              _frames[i].traces.push(nCurrentTraces + j);
+            }
           }
-          // Get sorted array of matching indices in trace.key
-          var matches = findNestedMatches(trace.key, keys);
-          if (matches.length > 0) {
-            trace = subsetArrayAttrs(trace, matches);
-            trace.marker = this.gd._fullData[newTracesIndex[0]].marker || {};
-            trace.line = this.gd._fullData[newTracesIndex[0]].line || {};
-            frames[i].data.push(trace);
+          
+          // nothing to do...
+          if (origIdx.length === 0) {
+            continue
           }
+          
+          for (var j = 0; j < origIdx.length; j++) {
+            var frameTrace = _frames[i].data[origIdx[j]];
+            if (!frameTrace.key || frameTrace.set !== group) {
+              continue;
+            }
+            // Get sorted array of matching indices in trace.key
+            var matches = findNestedMatches(frameTrace.key, keys);
+            if (matches.length > 0) {
+              frameTrace = subsetArrayAttrs(frameTrace, matches);
+              var d = gd._fullData[newIdx[j]];
+              if (d.marker) {
+                frameTrace.marker = d.marker;
+              }
+              if (d.line) {
+                frameTrace.line = d.line;
+              }
+              if (d.textfont) {
+                frameTrace.textfont = d.textfont;
+              }
+              _frames[i].data.push(frameTrace);
+            }
+          }
+          
+          // update gd._transitionData._frameHash
+          _hash[_frames[i].name] = _frames[i];
         }
-        
-      }
       
-      // modify the original frames...idea came from source of Plotly.deleteFrames
-      ops = [];
-      for (var i = 0; i < frames.length; i++) {
-        ops.push({type: "replace", index: i, value: frames[i]});
-      }
-      if (ops.length > 0) {
-        Plotly.Plots.modifyFrames(this.gd, ops);
-      }
+      });
       
     }
     

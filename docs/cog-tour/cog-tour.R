@@ -34,7 +34,7 @@ proj_dat <- function(step_size) {
   )
 }
 
-steps <- c(0, rep(1/15, 500))
+steps <- c(0, rep(1/15, 1000))
 stepz <- cumsum(steps)
 
 # tidy version of tour data
@@ -52,12 +52,12 @@ ax <- list(
   zeroline = F, showticklabels = F
 )
 
-#options(digits = 3)
+options(digits = 3)
 
 tour <- tour_dat %>%
   SharedData$new(~Name, group = "melb") %>%
   plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black"), 
-          height = 350, width = 700) %>%
+          height = 400, width = 700) %>%
   add_markers(text = ~Name, hoverinfo = "text") %>%
   layout(xaxis = ax, yaxis = ax)
 
@@ -70,8 +70,7 @@ axes <- proj_dat %>%
 # very important these animation options are specified _after_ subplot()
 # since they call plotly_build(., registerFrames = T)
 tour <- subplot(tour, axes, nrows = 1, shareY = T, margin = 0) %>% 
-  animationOpts(33, 0) %>%
-  animationSlider(hide = TRUE) %>%
+  animation_opts(33) %>%
   hide_legend() %>%
   layout(dragmode = "select") %>%
   highlight(persistent = TRUE)

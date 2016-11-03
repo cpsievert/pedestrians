@@ -49,12 +49,12 @@ ax <- list(
   zeroline = F, showticklabels = F
 )
 
-#options(digits = 3)
+options(digits = 3)
 
 tour <- tour_dat %>%
   SharedData$new(~Name, group = "melb") %>%
   plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black"), 
-          height = 400, width = 800) %>%
+          height = 500, width = 800) %>%
   add_markers(text = ~Name, hoverinfo = "text") %>%
   layout(xaxis = ax, yaxis = ax)
 
@@ -67,8 +67,7 @@ axes <- proj_dat %>%
 # very important these animation options are specified _after_ subplot()
 # since they call plotly_build(., registerFrames = T)
 tour <- subplot(tour, axes, nrows = 1, shareY = T, margin = 0) %>% 
-  animationOpts(33, 0) %>%
-  animationSlider(hide = TRUE) %>%
+  animation_opts(33) %>%
   hide_legend() %>%
   layout(dragmode = "select") %>%
   highlight(off = "plotly_deselect", persistent = TRUE)
@@ -161,8 +160,8 @@ dendro <- cog %>%
 html <- tags$div(
   style = "display: flex; flex-wrap: wrap",
   tags$div(map, style = "width: 24%; padding: 1em"),
-  tags$div(tour, style = "width: 38%; padding: 1em"),
-  tags$div(dendro, style = "width: 37%; padding: 1em"),
+  tags$div(tour, style = "width: 41%; padding: 1em"),
+  tags$div(dendro, style = "width: 35%; padding: 1em"),
   tags$div(pcp, style = "width: 40%; padding: 1em"),
   tags$div(iqr, style = "width: 50%; padding: 1em; border: solid;")
 )

@@ -67,8 +67,8 @@ axes <- proj_dat %>%
 # very important these animation options are specified _after_ subplot()
 # since they call plotly_build(., registerFrames = T)
 tour <- subplot(tour, axes, nrows = 1, shareY = T, margin = 0) %>% 
-  animationOpts(33, 0) %>%
-  animationSlider(hide = TRUE) %>%
+  animation_opts(33) %>%
+  animation_slider(hide = TRUE) %>%
   hide_legend() %>%
   layout(dragmode = "select") %>%
   highlight(persistent = TRUE)
