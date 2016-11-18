@@ -70,6 +70,6 @@ ts_pedestrians <- pedestrians %>%
   ts(frequency = 24)
   
 ## Compute cognostics
-cog <- tsmeasures(ts_pedestrians, width = 48) # 7*24 = 2 days window
+cog <- tsmeasures(ts_pedestrians, width = 24)
 rownames(cog) <- colnames(ts_pedestrians)
 devtools::use_data(cog, overwrite = TRUE)
