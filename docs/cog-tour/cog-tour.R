@@ -8,9 +8,6 @@ library(dplyr)
 library(tidyr)
 library(tourr)
 
-# for reproducing the sampled counts
-set.seed(9)
-
 data(pedestrians, package = "pedestrians")
 data(sensors, package = "pedestrians")
 data(cog, package = "pedestrians")
@@ -113,6 +110,8 @@ p2 <- p %>%
   highlight(off = "plotly_deselect", dynamic = TRUE, persistent = TRUE)
 
 # stratisfied random sample of raw data (needed for performance/speed)
+# for reproducing the sampled counts
+set.seed(9999)
 n <- nrow(pedestrians)
 idx <- c()
 for (i in unique(pedestrians$Name)) {
