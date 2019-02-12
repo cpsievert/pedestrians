@@ -16,8 +16,8 @@ Suggests:
     shiny,
     htmltools,
     crosstalk
-Suggests: knitr
+Suggests: 
+    knitr
 LazyData: true
 VignetteBuilder: knitr
-Remotes: ropensci/plotly#554
 RoxygenNote: 5.0.1
